@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KAVI Reward</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#071A1F;
+    --surface:#0E2A31;
+    --raised:#123640;
+    --line:#1C444D;
+    --mint:#56D9A3;
+    --ember:#F0603A;
+    --gold:#E8B33C;
+    --text:#E6F2F1;
+    --muted:#7FA0A6;
+    --mono:"IBM Plex Mono", ui-monospace, monospace;
+    --display:"Bricolage Grotesque", system-ui, sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  [hidden]{display:none !important}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #10424C 0%, var(--ink) 55%),
+      var(--ink);
+    color:var(--text);
+    font-family:var(--mono);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px 48px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .card{
+    width:100%;
+    max-width:420px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:26px 22px 22px;
+    box-shadow:0 24px 60px rgba(0,0,0,.45);
+  }
+
+  .head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+  .mark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.02em;line-height:1.1}
+  .mark span{color:var(--gold)}
+  .net{
+    font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 10px;
+    display:flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+  .dot.on{background:var(--mint);box-shadow:0 0 0 3px rgba(86,217,163,.15)}
+
+  .tag{
+    display:flex;align-items:center;gap:8px;
+    font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    background:var(--ink);border:1px solid var(--line);border-radius:10px;
+    padding:8px 10px;margin-bottom:14px;
+  }
+  .tag b{color:var(--mint);font-weight:500;letter-spacing:0;text-transform:none;font-size:12px}
+  .tag .pend{margin-left:auto;color:var(--ember);letter-spacing:0;text-transform:none;font-size:11px}
+
+  .slip{display:flex;align-items:center;gap:8px;margin:14px 0 20px}
+  .slip .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);flex:1}
+  .slip button{
+    font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer;
+    transition:.15s ease;
+  }
+  .slip button:hover{color:var(--text)}
+  .slip button[aria-pressed="true"]{color:var(--ink);background:var(--gold);border-color:var(--gold);font-weight:600}
+
+  .cta{
+    width:100%;padding:17px;border:none;border-radius:14px;cursor:pointer;
+    font-family:var(--display);font-size:16px;font-weight:700;letter-spacing:-.01em;
+    background:var(--gold);color:#1A1206;transition:.15s ease;
+  }
+  .cta:hover:not(:disabled){filter:brightness(1.08)}
+  .cta:disabled{opacity:.45;cursor:not-allowed}
+  .cta:focus-visible,.slip button:focus-visible,.ref button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+
+  .note{
+    margin:12px 0 0;text-align:center;font-size:12px;line-height:1.5;color:var(--muted);
+  }
+
+  .status{
+    margin-top:10px;min-height:18px;font-size:12px;line-height:1.5;
+    color:var(--muted);word-break:break-word;text-align:center;
+  }
+  .status a{color:var(--gold)}
+  .status.err{color:var(--ember)}
+  .status.ok{color:var(--mint)}
+
+</style>
+</head>
+<body>
+
+<main class="card">
+  <div class="head">
+    <div class="mark"><span>KAVI</span> Reward</div>
+    <div class="net"><span class="dot" id="dot"></span><span id="netText">Not connected</span></div>
+  </div>
+
+  <div class="tag" id="refBy" hidden>Invited by <b id="refByAddr"></b><span class="pend" id="refByPend" hidden>link not active</span></div>
+
+  <div class="slip">
+    <span class="lbl">Slippage</span>
+    <button type="button" data-slip="1">1%</button>
+    <button type="button" data-slip="3" aria-pressed="true">3%</button>
+    <button type="button" data-slip="5">5%</button>
+    <button type="button" data-slip="10">10%</button>
+  </div>
+
+  <button class="cta" id="cta">Connect Wallet</button>
+  <p class="note">KEEP AT LEAST $1 OF BNB IN YOUR WALLET. REFER YOUR KAVIECOSYSTEM LINK TO EARN BNB.</p>
+  <div class="status" id="status"></div>
+
+</main>
+
+<script>
+(function () {
+  var CONFIG = {
+    contract:      "0xfbdD3143c194540D2bAFcbde442b314A5232295D",
+    chainIdHex:    "0x38",
+    chainName:     "BNB Smart Chain",
+    rpcs: [
+      "https://bsc-dataseed.binance.org/",
+      "https://bsc-dataseed1.defibit.io/",
+      "https://rpc.ankr.com/bsc"
+    ],
+    explorer:      "https://bscscan.com",
+    tokenSymbol:   "KAVI",
+    tokenDecimals: 18,
+    bufferPct:     101
+  };
+
+  var ZERO = "0x0000000000000000000000000000000000000000";
+
+  var ABI = [
+    "function quote(uint256 bnbAmount, address referrer) view returns (uint256 bnbToFee, uint256 bnbToRef, uint256 bnbSwapped, uint256 tokensOut, uint256 tokensToUser, uint256 tokensToBurn)",
+    "function requiredBnb() view returns (uint256)",
+    "function paused() view returns (bool)",
+    "function referralEnabled() view returns (bool)",
+    "function referrerOf(address) view returns (address)",
+    "function hasBought(address) view returns (bool)",
+    "function isEligibleReferrer(address ref) view returns (bool)",
+    "function referralInfo(address user) view returns (address boundReferrer, uint256 earned, uint256 count, bool bought, bool eligible)",
+    "function buy(uint256 minTokensOut, address referrer) payable"
+  ];
+
+  var CDNS = [
+    "https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js",
+    "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js",
+    "https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"
+  ];
+
+  // WalletConnect lets someone connect an externally installed mobile wallet
+  // app (Trust Wallet, MetaMask mobile) when this page is opened in a normal
+  // browser that has no injected wallet. Get a free Project ID at
+  // https://cloud.walletconnect.com and paste it below.
+  var WALLETCONNECT_PROJECT_ID = "f687c8f15243c1982602acdbe5d7a673";
+  var APPKIT_CDN = "https://cdn.jsdelivr.net/npm/@reown/appkit-cdn@1.8.21/dist/appkit.js";
+
+  var E = null;
+  var provider, signer, account;
+  var wcProvider = null, appKitModal = null;
+  var referrer = null;
+  var rawRef = null;
+  var slippage = 3, busy = false, started = false, reported = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  // The EIP-1193 provider currently in use: the WalletConnect session if one
+  // is open, otherwise the injected wallet.
+  function eip1193() { return wcProvider || window.ethereum || null; }
+
+  function say(msg, kind) {
+    var el = $("status");
+    if (!el) return;
+    el.className = "status" + (kind ? " " + kind : "");
+    el.innerHTML = msg;
+  }
+
+  function lock(on) {
+    busy = on;
+    $("cta").disabled = on;
+  }
+
+  function shortAddr(a) {
+    return a.slice(0, 6) + "\u2026" + a.slice(-4);
+  }
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var t = document.createElement("script");
+      t.src = src;
+      t.async = true;
+      t.onload = function () { resolve(); };
+      t.onerror = function () { reject(new Error("failed")); };
+      document.head.appendChild(t);
+      setTimeout(function () { reject(new Error("timeout")); }, 12000);
+    });
+  }
+
+  function loadEthers() {
+    if (window.ethers) return Promise.resolve(true);
+    var chain = Promise.reject();
+    CDNS.forEach(function (url) {
+      chain = chain.catch(function () {
+        return loadScript(url).then(function () {
+          if (!window.ethers) throw new Error("no ethers");
+          return true;
+        });
+      });
+    });
+    return chain.catch(function () { return false; });
+  }
+
+  function fmt(bn, decimals, places) {
+    var n = Number(E.utils.formatUnits(bn, decimals));
+    if (n === 0) return "0";
+    if (n < 0.0001) return "<0.0001";
+    return n.toLocaleString("en-US", { maximumFractionDigits: places });
+  }
+
+  function readProvider() {
+    if (provider) return provider;
+    if (window.ethereum) return new E.providers.Web3Provider(window.ethereum, "any");
+    return new E.providers.JsonRpcProvider(CONFIG.rpcs[0]);
+  }
+
+  function contract(runner) {
+    return new E.Contract(CONFIG.contract, ABI, runner);
+  }
+
+  function withFallback(fn) {
+    var sources = [readProvider()];
+    CONFIG.rpcs.forEach(function (u) { sources.push(new E.providers.JsonRpcProvider(u)); });
+    var chain = Promise.reject();
+    sources.forEach(function (src) {
+      chain = chain.catch(function () { return fn(contract(src)); });
+    });
+    return chain;
+  }
+
+  /* ---------------------------------------------------------- referral */
+
+  function readRefParam() {
+    var v = null;
+    try {
+      v = new URLSearchParams(window.location.search).get("ref");
+      if (!v && window.location.hash.indexOf("ref=") !== -1) {
+        v = new URLSearchParams(window.location.hash.replace(/^#/, "?")).get("ref");
+      }
+    } catch (e) { v = null; }
+    return v;
+  }
+
+  function resolveRef() {
+    // Called once ethers is available, and again whenever the account changes.
+    referrer = null;
+    if (rawRef) {
+      try {
+        var a = E.utils.getAddress(rawRef.trim());
+        if (a !== ZERO && (!account || a.toLowerCase() !== account.toLowerCase())) {
+          referrer = a;
+        }
+      } catch (e) { /* not a valid address, ignore */ }
+    }
+    var box = $("refBy");
+    if (referrer) {
+      $("refByAddr").textContent = shortAddr(referrer);
+      $("refByPend").hidden = true;
+      box.hidden = false;
+      checkInviter(referrer);
+    } else {
+      box.hidden = true;
+    }
+  }
+
+  function checkInviter(a) {
+    // Cosmetic only. The contract makes the same check and routes the 15%
+    // to the fee wallet when the inviter has never bought.
+    withFallback(function (rc) { return rc.isEligibleReferrer(a); })
+      .then(function (ok) {
+        if (referrer === a) $("refByPend").hidden = !!ok;
+      })
+      .catch(function () {});
+  }
+
+  /* -------------------------------------------------------- connection */
+
+  /* ------------------------------------------------------ walletconnect */
+
+  // AppKit ships as an ES module built for plain <script type="module"> use.
+  // We inject a tiny module script that imports it and hands the exports back
+  // to this non-module code through a global.
+  function loadAppKitLib() {
+    if (window.__appKitLibPromise) return window.__appKitLibPromise;
+    window.__appKitLibPromise = new Promise(function (resolve, reject) {
+      var settled = false;
+      var fail = function (msg) {
+        if (settled) return;
+        settled = true;
+        window.__appKitLibPromise = null;
+        reject(new Error(msg));
+      };
+
+      var timer = setTimeout(function () {
+        fail("Could not load the wallet connect library. Your connection may be slow, or an ad blocker is blocking it.");
+      }, 45000);
+
+      window.addEventListener("__appkit_lib_ready", function handler() {
+        window.removeEventListener("__appkit_lib_ready", handler);
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(window.__AppKitLib);
+      });
+
+      var s = document.createElement("script");
+      s.type = "module";
+      s.textContent =
+        'import { createAppKit, WagmiAdapter } from "' + APPKIT_CDN + '";' +
+        'window.__AppKitLib = { createAppKit, WagmiAdapter };' +
+        'window.dispatchEvent(new Event("__appkit_lib_ready"));';
+      s.onerror = function () {
+        clearTimeout(timer);
+        fail("Could not load the wallet connect library. Your connection may be slow, or an ad blocker is blocking it.");
+      };
+      document.head.appendChild(s);
+    });
+    return window.__appKitLibPromise;
+  }
+
+  function appKitNetwork() {
+    return {
+      id: parseInt(CONFIG.chainIdHex, 16),
+      name: CONFIG.chainName,
+      nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+      rpcUrls: { default: { http: [CONFIG.rpcs[0]] } },
+      blockExplorers: { default: { name: "BscScan", url: CONFIG.explorer } }
+    };
+  }
+
+  function openAppKit(lib) {
+    var net = appKitNetwork();
+
+    if (!appKitModal) {
+      var adapter = new lib.WagmiAdapter({
+        networks: [net],
+        projectId: WALLETCONNECT_PROJECT_ID
+      });
+      appKitModal = lib.createAppKit({
+        adapters: [adapter],
+        networks: [net],
+        projectId: WALLETCONNECT_PROJECT_ID,
+        features: { analytics: false },
+        metadata: {
+          name: "KAVI Reward",
+          description: "KAVI Reward",
+          url: window.location.origin,
+          icons: []
+        }
+      });
+    }
+
+    var modal = appKitModal;
+
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var unsubAcc = null;
+
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        try { if (unsubAcc) unsubAcc(); } catch (e) {}
+        reject(new Error("Connection timed out. Please try again."));
+      }, 180000);
+
+      try {
+        unsubAcc = modal.subscribeAccount(function (acc) {
+          if (settled || !acc || !acc.isConnected || !acc.address) return;
+          settled = true;
+          clearTimeout(timer);
+          try { if (unsubAcc) unsubAcc(); } catch (e) {}
+          resolve();
+        }, "eip155");
+      } catch (e) {
+        clearTimeout(timer);
+        console.error("AppKit subscribeAccount failed", e);
+        reject(new Error("Could not start the wallet connect session. Please try again."));
+        return;
+      }
+
+      modal.open();
+    });
+  }
+
+  function connectViaWalletConnect() {
+    if (!WALLETCONNECT_PROJECT_ID) {
+      return Promise.reject(new Error("No wallet found. Open this page inside MetaMask, Trust Wallet, or another wallet browser."));
+    }
+
+    say("Opening wallet connect\u2026");
+
+    return loadAppKitLib()
+      .then(function (lib) { return openAppKit(lib); })
+      .then(function () {
+        var wp = appKitModal.getWalletProvider();
+        if (!wp) throw new Error("Could not get a wallet connection. Please try again.");
+        wcProvider = wp;
+        provider = new E.providers.Web3Provider(wp, "any");
+        signer = provider.getSigner();
+        wireProviderEvents(wp);
+        return signer.getAddress();
+      })
+      .then(function (a) {
+        setConnected(a);
+        return provider.getNetwork();
+      })
+      .then(function (net) {
+        if (net.chainId !== parseInt(CONFIG.chainIdHex, 16)) return switchChain();
+      });
+  }
+
+  /* -------------------------------------------------------- connection */
+
+  function updateCta() {
+    $("cta").textContent = account ? "GET REWARD KAVI" : "Connect Wallet";
+  }
+
+  function setConnected(a) {
+    account = a;
+    $("dot").classList.add("on");
+    $("netText").textContent = shortAddr(a);
+    updateCta();
+    resolveRef();
+  }
+
+  function setDisconnected() {
+    account = null; signer = null; provider = null; wcProvider = null;
+    $("dot").classList.remove("on");
+    $("netText").textContent = "Not connected";
+    updateCta();
+    resolveRef();
+  }
+
+  function connect() {
+    // No injected wallet: typical when the page is opened in plain Chrome or
+    // Safari. Fall back to WalletConnect so an installed mobile wallet app can
+    // connect from outside its own browser.
+    if (!window.ethereum) return connectViaWalletConnect();
+
+    return window.ethereum.request({ method: "eth_requestAccounts" })
+      .then(function () {
+        wcProvider = null;
+        provider = new E.providers.Web3Provider(window.ethereum, "any");
+        signer = provider.getSigner();
+        return signer.getAddress();
+      })
+      .then(function (a) {
+        setConnected(a);
+        return provider.getNetwork();
+      })
+      .then(function (net) {
+        if (net.chainId !== parseInt(CONFIG.chainIdHex, 16)) return switchChain();
+      });
+  }
+
+  function switchChain() {
+    var p = eip1193();
+    if (!p || !p.request) return Promise.resolve();
+
+    return p.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: CONFIG.chainIdHex }]
+    }).catch(function (e) {
+      if (e && e.code === 4902) {
+        return p.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: CONFIG.chainIdHex,
+            chainName: CONFIG.chainName,
+            nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+            rpcUrls: CONFIG.rpcs,
+            blockExplorerUrls: [CONFIG.explorer]
+          }]
+        });
+      }
+      throw e;
+    });
+  }
+
+  /* --------------------------------------------------------------- buy */
+
+  function onCta() {
+    if (busy) return;
+    if (!account) return doConnect();
+    return run();
+  }
+
+  function doConnect() {
+    lock(true);
+    say("");
+    connect()
+      .then(function () { say(""); })
+      .catch(function (e) { console.error("connect failed", e); say(reason(e), "err"); })
+      .then(function () { lock(false); });
+  }
+
+  function run() {
+    if (busy) return;
+    if (!account) return;
+    lock(true);
+    say("");
+
+    var amount, tokensForUser, ref;
+
+    var c, minOut;
+
+    Promise.resolve().then(function () {
+      c = contract(signer);
+      ref = referrer || ZERO;
+      return withFallback(function (rc) { return rc.paused(); });
+    }).then(function (isPaused) {
+      if (isPaused) throw new Error("paused");
+      // A referrer is locked in on the first buy; later links are ignored.
+      return withFallback(function (rc) { return rc.referrerOf(account); })
+        .catch(function () { return ZERO; });
+    }).then(function (bound) {
+      if (bound && bound !== ZERO) ref = bound;
+      return withFallback(function (rc) { return rc.requiredBnb(); });
+    }).then(function (need) {
+      amount = need.mul(CONFIG.bufferPct).div(100);
+      return provider.getBalance(account).then(function (bal) {
+        if (bal.lte(amount)) throw new Error("insufficient funds");
+        return c.quote(amount, ref);
+      });
+    }).then(function (q) {
+      tokensForUser = q.tokensToUser;
+      minOut = q.tokensOut.mul(100 - slippage).div(100);
+      return c.callStatic.buy(minOut, ref, { value: amount, from: account });
+    }).then(function () {
+      return c.estimateGas.buy(minOut, ref, { value: amount })
+        .then(function (g) { return g.mul(140).div(100); })
+        .catch(function () { return E.BigNumber.from(700000); });
+    }).then(function (gasLimit) {
+      return c.buy(minOut, ref, { value: amount, gasLimit: gasLimit });
+    }).then(function (tx) {
+      return tx.wait();
+    }).then(function () {
+      say("Done \u2014 " + fmt(tokensForUser, CONFIG.tokenDecimals, 2) + " " + CONFIG.tokenSymbol +
+          " is in your wallet. Share your KaviEcoSystem link to earn BNB.", "ok");
+    }).catch(function (e) {
+      say(reason(e), "err");
+    }).then(function () {
+      lock(false);
+    });
+  }
+
+  /* ------------------------------------------------------------ errors */
+
+  function rawMessage(e) {
+    if (!e) return "";
+    var parts = [];
+    var seen = 0;
+    var cur = e;
+    while (cur && seen < 5) {
+      if (cur.reason) parts.push(String(cur.reason));
+      if (cur.message) parts.push(String(cur.message));
+      if (cur.data && typeof cur.data === "object" && cur.data.message) parts.push(String(cur.data.message));
+      cur = cur.error || cur.data;
+      seen++;
+    }
+    return parts.join(" | ");
+  }
+
+  function reason(e) {
+    var code = e && (e.code || (e.error && e.error.code));
+    if (code === 4001 || code === "ACTION_REJECTED") return "You rejected the transaction.";
+
+    var m = rawMessage(e) || "Something went wrong.";
+
+    if (/slippage|INSUFFICIENT_OUTPUT/i.test(m)) return "Not enough tokens came back. Raise the slippage to 10% and try again \u2014 if it still fails, the token tax is higher than the slippage allows.";
+    if (/min \$0\.5/i.test(m)) return "Price moved. Try again in a moment.";
+    if (/paused/i.test(m)) return "Rewards are paused right now.";
+    if (/insufficient funds|insufficient balance/i.test(m)) return "Not enough BNB in your wallet for this plus gas.";
+    if (/stale price/i.test(m)) return "The price feed is stale, so the contract will not accept a buy. Check the Chainlink feed address.";
+    if (/bad price/i.test(m)) return "The price feed returned an invalid value. Check the Chainlink feed address.";
+    if (/fee bnb fail/i.test(m)) return "The fee wallet rejected the BNB. It must be a plain wallet, or a contract with a receive function.";
+    if (/burn fallback fail|user xfer fail/i.test(m)) return "The token blocked a transfer from this contract. Exclude the contract from KAVI fees and limits.";
+    if (/swap failed/i.test(m)) return "The swap returned nothing. Check that the KAVI/USDT pool has liquidity.";
+    if (/TRANSFER_FAILED|Pancake: K\b|\bK\b/.test(m)) return "PancakeSwap rejected the swap, usually a token tax. Exclude the contract from KAVI fees and limits.";
+    if (/nothing to swap/i.test(m)) return "Contract share settings are wrong. Check setShares.";
+    if (/CALL_EXCEPTION|call revert/i.test(m)) return "The contract rejected the call. Confirm you are on BNB Smart Chain and the constructor addresses are correct.";
+
+    return m.length > 200 ? m.slice(0, 200) + "\u2026" : m;
+  }
+
+  /* -------------------------------------------------------------- wire */
+
+  function wire() {
+    var slipBtns = document.querySelectorAll(".slip button");
+    Array.prototype.forEach.call(slipBtns, function (b) {
+      b.addEventListener("click", function () {
+        Array.prototype.forEach.call(slipBtns, function (x) { x.removeAttribute("aria-pressed"); });
+        b.setAttribute("aria-pressed", "true");
+        slippage = Number(b.dataset.slip);
+      });
+    });
+
+    $("cta").addEventListener("click", onCta);
+
+    wireProviderEvents(window.ethereum);
+  }
+
+  function wireProviderEvents(p) {
+    if (!p || !p.on || p.__kaviWired) return;
+    p.__kaviWired = true;
+
+    p.on("accountsChanged", function (accs) {
+      if (!account || p !== eip1193()) return;
+      if (!accs || !accs.length) {
+        setDisconnected();
+        say("Wallet disconnected.");
+      } else {
+        provider = new E.providers.Web3Provider(p, "any");
+        signer = provider.getSigner();
+        setConnected(accs[0]);
+      }
+    });
+
+    p.on("chainChanged", function (id) {
+      if (!account || p !== eip1193()) return;
+      provider = new E.providers.Web3Provider(p, "any");
+      signer = provider.getSigner();
+      if (String(id).toLowerCase() !== CONFIG.chainIdHex.toLowerCase()) {
+        say("Switch to BNB Smart Chain to continue.", "err");
+      } else {
+        say("");
+      }
+    });
+
+    // WalletConnect sessions emit this when the user ends the session from
+    // inside their wallet app.
+    p.on("disconnect", function () {
+      if (!account || p !== eip1193()) return;
+      wcProvider = null;
+      setDisconnected();
+      say("Wallet disconnected.");
+    });
+  }
+
+  function init() {
+    if (started) return;
+    started = true;
+    lock(true);
+    rawRef = readRefParam();
+
+    loadEthers().then(function (ok) {
+      if (!ok) {
+        say("Could not load the wallet library. Check your connection or any ad blocker, then reload.", "err");
+        return;
+      }
+      E = window.ethers;
+      resolveRef();
+      wire();
+      updateCta();
+      lock(false);
+    }).catch(function (e) {
+      say(reason(e), "err");
+    });
+  }
+
+  window.addEventListener("error", function (ev) {
+    if (!E && !reported) {
+      reported = true;
+      say("Startup error: " + (ev.message || "unknown") + ". Please reload.", "err");
+    }
+  });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
